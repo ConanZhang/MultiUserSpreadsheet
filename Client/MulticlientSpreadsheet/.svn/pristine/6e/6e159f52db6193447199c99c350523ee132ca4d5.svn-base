@@ -1,0 +1,49 @@
+﻿using System;
+using System.Collections.Generic;
+using System.ComponentModel;
+using System.Drawing;
+using System.Data;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
+using System.Windows.Forms;
+
+
+namespace SS
+{
+    public partial class ConnectionScreen : UserControl
+    {
+        private SSClientModel model;
+        private Form1 form;
+        public ConnectionScreen()
+        {
+            InitializeComponent();
+        }
+
+        public void setModel(SSClientModel m)
+        {
+            model = m;
+        }
+
+        public void setForm(Form1 f)
+        {
+            form = f;
+        }
+
+        private void ConnectButton_Click(object sender, EventArgs e)
+        {
+            // Form form = ConnectButton.FindForm();
+            //form.Close();
+           // int port = Convert.ToInt32(ServerPortText.Text);
+              model.Connect("lab1-21.eng.utah.edu", 2115, "sysadmin", "newFile");
+            //model.Connect("lab" + ServerIpText.Text + ".eng.utah.edu", port, UsernameText.Text, SpreadsheetNameText.Text);
+            //model.Connect(ServerIpText.Text, port, UsernameText.Text, SpreadsheetNameText.Text);
+            //model.Connect("lab1-34.eng.utah.edu", 2119, UsernameText.Text, "spreadsheet1");
+            // form.createSpreadsheet();
+            // this.SendToBack();
+            // this.Dispose();
+            // form.Show();
+        }
+
+    }
+}

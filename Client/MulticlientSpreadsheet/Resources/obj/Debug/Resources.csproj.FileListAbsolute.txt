@@ -1,0 +1,12 @@
+C:\Users\Bharath\Documents\Visual Studio 2013\Projects\MulticlientSpreadsheet\Resources\bin\Debug\Resources.dll.config
+C:\Users\Bharath\Documents\Visual Studio 2013\Projects\MulticlientSpreadsheet\Resources\bin\Debug\Resources.dll
+C:\Users\Bharath\Documents\Visual Studio 2013\Projects\MulticlientSpreadsheet\Resources\bin\Debug\Resources.pdb
+C:\Users\Bharath\Documents\Visual Studio 2013\Projects\MulticlientSpreadsheet\Resources\obj\Debug\Resources.dll
+C:\Users\Bharath\Documents\Visual Studio 2013\Projects\MulticlientSpreadsheet\Resources\obj\Debug\Resources.pdb
+C:\Users\Bharath\Documents\Visual Studio 2013\Projects\MulticlientSpreadsheet\Resources\obj\Debug\Resources.csprojResolveAssemblyReference.cache
+X:\Spreadsheet\Client\MulticlientSpreadsheet\Resources\bin\Debug\Resources.dll.config
+X:\Spreadsheet\Client\MulticlientSpreadsheet\Resources\bin\Debug\Resources.dll
+X:\Spreadsheet\Client\MulticlientSpreadsheet\Resources\bin\Debug\Resources.pdb
+X:\Spreadsheet\Client\MulticlientSpreadsheet\Resources\obj\Debug\Resources.csprojResolveAssemblyReference.cache
+X:\Spreadsheet\Client\MulticlientSpreadsheet\Resources\obj\Debug\Resources.dll
+X:\Spreadsheet\Client\MulticlientSpreadsheet\Resources\obj\Debug\Resources.pdb

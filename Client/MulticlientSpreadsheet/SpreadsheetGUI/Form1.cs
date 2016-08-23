@@ -1,0 +1,679 @@
+﻿using System;
+using System.Collections.Generic;
+using System.ComponentModel;
+using System.Data;
+using System.Drawing;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
+using System.Windows.Forms;
+using SpreadsheetUtilities;
+using System.Text.RegularExpressions;
+
+namespace SS
+{
+    /// <summary>
+    /// The Gui for the spreadsheet
+    /// By Bharath Gunasekaran
+    /// </summary>
+
+    public partial class Form1 : Form
+    {
+        //The class that makes the spread sheet do its fuctionality
+        Spreadsheet spreadsheetModel;
+        //needed to know the col and row of the previous selected cel
+        int x = 0;
+        int y = 0;
+        int numcells;
+        //checks if the user pressed enter after populating a cell
+        bool nEnter = false;
+        //need to allow copy and paste fuctionality
+
+        SSClientModel clientSocketModel;
+        ConnectionScreen cs;
+        RegisterScreen reg;
+
+        // A lock for reading and changing the underlying model. 
+        // Used to avoid concurrent modifcation problems with the model.
+        String modelLock;
+
+        public Form1()
+        {
+            clientSocketModel = new SSClientModel();
+            cs = new ConnectionScreen();
+            spreadsheetModel = new Spreadsheet(isValid, s => s.ToUpper(), "PS6");
+            this.Size = new Size(460, 332);
+            cs.Location = new System.Drawing.Point(0, 0);
+            cs.Dock = DockStyle.Fill;
+            this.Controls.Add(cs);
+            this.Text = "Login Screen";
+            cs.setForm(this);
+            cs.setModel(clientSocketModel);
+            clientSocketModel.IncomingErrorEvent += error;
+            clientSocketModel.CellChangeEvent += cellUpdate;
+            clientSocketModel.Connection += connectionConfirmed;
+            modelLock = "lock";
+        }
+
+
+        public void createSpreadsheet()
+        {
+
+            //cs.Dispose();
+            cs.Invoke(new Action(() => { cs.Dispose(); }));
+            //cs.Invoke(cs.Dispose());
+            InitializeComponent();
+            this.KeyPreview = true;
+            sPanel.SelectionChanged += displaySelection;
+            sPanel.SetSelection(0, 0);
+            cName.Text = getCellName(0, 0);
+            cellName.Text = getCellName(0, 0);
+            this.ActiveControl = cContent;
+            this.Text = clientSocketModel.filename;
+            registerScreen.setModel(clientSocketModel);
+            registerScreen.setForm(this);
+
+
+        }
+
+        //Event for Model
+        private void connectionConfirmed(String s)
+        {
+       
+            if (s.StartsWith("connected"))
+            {
+                // this.Invoke(new Action(() => { createSpreadsheet();}));
+                numcells = int.Parse(s.Substring(9));
+                if (numcells == 0)
+                {
+                    this.Invoke(new Action(() => { createSpreadsheet(); }));
+                }
+            }
+        }
+
+        private void error(String s)
+        {
+            s.Trim();
+            if(s.Equals("error 0 Server is dead"))
+                ConnectionStatus.Text = "Connection Lost";
+            else if(s.StartsWith("error 0"))
+                MessageBox.Show(s.Substring(8));
+            else if (s.StartsWith("error 1 "))
+                MessageBox.Show(s.Substring(8));
+            else if (s.StartsWith("error 2 "))
+                MessageBox.Show(s.Substring(8) + " Is an invalid command in this context");
+            else if (s.StartsWith("error 3 "))
+                MessageBox.Show(s.Substring(8));
+            else if (s.StartsWith("error 4 "))
+            {
+             //   this.Invoke(new Action(() => { setUp(); }));
+                MessageBox.Show(s.Substring(8) + " Us");
+            }
+        }
+        private void cellUpdate(String s)
+        {
+            lock (modelLock)
+            {
+                s.Trim();
+                String[] tokens = s.Split(' ');
+                //case where spreadsheet is all ready open
+                if (numcells > 0)
+                {
+                    //update cell by s
+                    spreadsheetModel.SetContentsOfCell(tokens[1], tokens[2]);
+                    numcells--;
+                    if (numcells == 0)
+                    {
+                        this.Invoke(new Action(() => { createSpreadsheet(); }));
+                        IEnumerable<String> temp = spreadsheetModel.GetNamesOfAllNonemptyCells();
+                        int col, row;
+                        sPanel.GetSelection(out col, out row);
+                        updateView(getCellName(col, row));
+                        updateView(temp);
+                        numcells--;
+                    }
+                }
+                else
+                {
+                    spreadsheetModel.SetContentsOfCell(tokens[1], tokens[2]);
+                    //  int col, row;
+                    //  findCellLocation(tokens[1], out col, out row);
+                    //  sPanel.GetSelection(out col, out row);
+                    updateView(tokens[1]);
+                    //update cell by s
+
+                }
+            }
+        }
+
+        //Form Events
+        /// <summary>
+        /// Creates another spreadsheet it its own window
+        /// </summary>
+        /// <param name="sender"></param>
+        /// <param name="e"></param>
+        private void newToolStripMenuItem_Click(object sender, EventArgs e)
+        {
+            // Tell the application context to run the form on the same
+            // thread as the other forms.
+            DemoApplicationContext.getAppContext().RunForm();
+
+        }
+
+        private void undoToolStripMenuItem_Click(object sender, EventArgs e)
+        {
+            clientSocketModel.Undo();
+        }
+
+        /// <summary>
+        /// Closes the current Gui window
+        /// </summary>
+        /// <param name="sender"></param>
+        /// <param name="e"></param>
+        private void closeToolStripMenuItem_Click(object sender, EventArgs e)
+        {
+
+            Close();
+
+        }
+
+        private void registerUserToolStripMenuItem_Click(object sender, EventArgs e)
+        {
+            sPanel.SendToBack();
+            this.ActiveControl = registerScreen;
+            registerScreen.Show();
+            registerScreen.Visible = true;
+
+        }
+        /// <summary>
+        /// Give a user a guide to how the spreadsheet application works
+        /// </summary>
+        /// <param name="sender"></param>
+        /// <param name="e"></param>
+        private void helpToolStripMenuItem_Click(object sender, EventArgs e)
+        {
+
+            MessageBox.Show("The cells can be selected by mouse clicks or by using the arrow keys. \n" +
+                            "My spreadsheet will always display the content of the cell you are on.\n" +
+                            "I have message box for all the exceptions that happen and revert back \n" +
+                            "to the state before the exception was thrown. \n" +
+
+                            "Extra Features \n" +
+
+                            "1) Can use arrow keys to move \n" +
+                            "2) Copy and Paste fuctionality \n" +
+                            "3) Hot Keys for all menu options \n" +
+                            "4) Can open a spreadsheet in a new window or current window. \n" +
+                            "5) Can right click to show options to empty the current spreadsheet.", "HELP");
+        }
+
+
+        /// <summary>
+        /// What to do when changing the text of a textbox
+        /// </summary>
+        /// <param name="sender"></param>
+        /// <param name="e"></param>
+        private void content_TextChanged(object sender, EventArgs e)
+        {
+            //Checks to see if were are clicking on the current cell
+            //If you aren't then it updates the content of the cell and creates it 
+            if (!cellContent.Text.Equals(cContent.Text))
+            {
+                int col, row;
+                sPanel.GetSelection(out col, out row);
+                sPanel.SetValue(col, row, cContent.Text);
+                cellContent.Text = cContent.Text;
+                nEnter = true;
+            }
+            else
+            {
+                nEnter = false;
+            }
+
+        }
+
+        private void KeyDown(object sender, KeyEventArgs e)
+        {
+
+            // Check for Enter key
+            if (e.KeyCode == Keys.Enter)
+            {
+                nEnter = false;
+                // get current row and column
+                int col, row;
+                String value;
+                sPanel.GetSelection(out col, out row);
+                //adds the new content of the cell and to the spreadsheet class
+                foreach (String name in addToSpreadsheet(col, row))
+                {
+                    setValue(name);
+                    sPanel.GetValue(col, row, out value);
+                    cValue.Text = value;
+                    cellValue.Text = value;
+
+                }
+                e.Handled = true;
+            }
+            else if (e.KeyCode == Keys.Up || e.KeyCode == Keys.Down || e.KeyCode == Keys.Right || e.KeyCode == Keys.Left)
+            {
+                moveSelection(e);
+            }
+        }
+
+        /// <summary>
+        /// Moves the the display of the spreadsheet panel 
+        /// </summary>
+        /// <param name="e"></param>
+        private void moveSelection(KeyEventArgs e)
+        {
+            //getting current location 
+            int row, col;
+            sPanel.GetSelection(out col, out row);
+            //depending on the key pressed I move the expected cell
+            if (e.KeyCode == Keys.Up)
+            {
+                sPanel.SetSelection(col, row - 1);
+            }
+            else if (e.KeyCode == Keys.Down)
+            {
+                sPanel.SetSelection(col, row + 1);
+            }
+            else if (e.KeyCode == Keys.Left)
+            {
+                sPanel.SetSelection(col - 1, row);
+            }
+            else if (e.KeyCode == Keys.Right)
+            {
+                sPanel.SetSelection(col + 1, row);
+            }
+
+            //need to update the displace of the current cell
+            displaySelection(sPanel);
+        }
+
+
+        /// <summary>
+        /// Displays the content of the Cell
+        /// </summary>
+        /// <param name="ss"></param>
+        private void displaySelection(SpreadsheetPanel ss)
+        {
+            lock (modelLock)
+            {
+                //making sure the focus of the gui is on the content textbox
+                cContent.Focus();
+
+                //getting row and col for the cell
+                int row, col;
+                String name = "";
+                String content = "";
+                String value;
+                ss.GetSelection(out col, out row);
+                ss.GetValue(col, row, out value);
+                name = getCellName(col, row);
+
+                //takes care of when enter is not pressed
+                if (nEnter && !(x == col && y == row))
+                {
+                    addToSpreadsheet(x, y);
+                    setValue(getCellName(x, y));
+                    nEnter = false;
+                }
+                else if (nEnter)
+                {
+                    //   setValue(cellValue.Text);
+                    content = value;
+                    value = cellValue.Text;
+
+                }
+
+                //Sets the content of the selected cell to show the cells content
+                Object temp = spreadsheetModel.GetCellContents(getCellName(col, row));
+                if (temp is Formula)
+                {
+                    Formula f = (Formula)temp;
+                    content = "=" + f.ToString();
+                }
+                else if (temp is Double)
+                {
+                    Double d = (Double)temp;
+                    content = d.ToString();
+
+                }
+                else
+                {
+                    content = temp.ToString();
+                }
+
+                //updates the textboxes
+                updateDisplays(name, content, value);
+
+
+                x = col;
+                y = row;
+                //updates the view of the spreadsheet panel
+                updateView(spreadsheetModel.GetNamesOfAllNonemptyCells());
+                //At this point, the value has been set and is valid
+            }
+        }
+
+
+
+
+
+
+        /// <summary>
+        /// Set the value of the Cell
+        /// If the value of the Cell is a FormulaError according to that the rest of the equation was
+        /// The value of the Cell will always be double, string, or N/0.
+        /// </summary>
+        /// <param name="name"></param>
+        private void setValue(String name)
+        {
+            lock (modelLock)
+            {
+
+
+                Object cellValue = null;
+                Formula f = null;
+                Boolean inValidVar;
+                double value;
+                int row, col;
+                //need to work on this for Exceptions
+                findCellLocation(name, out col, out row);
+                cellValue = spreadsheetModel.GetCellValue(name);
+
+                //checking if the cellValue is formula error
+                if (cellValue is FormulaError)
+                {
+                    FormulaError n = (FormulaError)cellValue;
+                    //checking what type of error. To find out what needs to be displayed in the cell
+                    if (n.Reason.Equals("Divide by 0"))
+                    {
+                        sPanel.SetValue(col, row, "Div/0");
+                    }
+                    else if (n.Reason.Equals("Invalid Variable: Variable is not defined"))
+                    {
+                        //Takes care of the case if you want to copy a string from on cell to another
+                        //If you have an equation and cell has no value, 
+                        //the cell will be given the value 0 and the equation will be calculated
+                        //Checking if you are adding a string with a number. 
+                        f = (Formula)spreadsheetModel.GetCellContents(name);
+
+                        value = getValue(f.GetVariables(), f.ToString(), out inValidVar);
+
+                        if (inValidVar)
+                        {
+                            if (value == 876697)
+                            {
+                                int x = col;
+                                int y = row;
+                                string val; ;
+                                findCellLocation(f.GetVariables().ElementAt(0), out col, out row);
+                                sPanel.GetValue(col, row, out val);
+                                sPanel.SetValue(x, y, val);
+                            }
+                            else
+                            {
+                                sPanel.SetValue(col, row, "" + "N/Value");
+                            }
+
+                        }
+                        else
+                        {
+                            sPanel.SetValue(col, row, "" + value);
+                        }
+                    }
+                }
+                //nothing is wrong, just add the value.
+                else
+                    sPanel.SetValue(col, row, "" + cellValue);
+            }
+        }
+
+        /// <summary>
+        /// Finds the value of the Cell, if the value of the cell is a FormulaError
+        /// Goes through all the variables in the equation and see if there values need to be modified or not.
+        /// If they need to be modified. It modifies the equation and calculated the value of the cell. 
+        /// </summary>
+        /// <param name="var"></param>
+        /// <param name="equation"></param>
+        /// <returns></returns>
+        private double getValue(IEnumerable<String> var, String equation, out Boolean inValidVar)
+        {
+            lock (modelLock)
+            {
+                int count = 0;
+
+                int col, row;
+                string value;
+                //getting a reference of all the cells that are occupied 
+                HashSet<String> exist = (HashSet<String>)spreadsheetModel.GetNamesOfAllNonemptyCells();
+                foreach (String variable in var)
+                {
+
+                    findCellLocation(variable, out col, out row);
+                    sPanel.GetValue(col, row, out value);
+
+                    //if the variable does not have a value in spreadsheet and has an empty string in gui
+                    //the cell is 0. 
+                    if (!exist.Contains(variable) && value.Equals(""))
+                    {
+                        equation = equation.Replace(variable, "0");
+                    }
+                    //if the value of the cell in the gui is not an empty string 
+                    //we know the the cell has a value
+                    else if (!value.Equals(""))
+                    {
+                        //checking if the displayed value is actually a string or a double 
+                        if (spreadsheetModel.GetCellValue(variable) is String || spreadsheetModel.GetCellValue(variable) is FormulaError)
+                        {
+                            //counting the number of variables that have the value of a string
+                            count++;
+                            //checking to see that the equation is just one variable 
+                            //if it is then the value that is displayed is the string of the variable
+                            if (equation.Contains("+") || equation.Contains("-") || equation.Contains("/") || equation.Contains("*") || equation.Contains("(") || equation.Contains(")"))
+                            {
+                                count++;
+                            }
+
+                        }
+                        //we know the value of the cell in the spreadsheet is a double, so we replace the variable with that value.
+                        else
+                        {
+                            equation = equation.Replace(variable, value);
+                        }
+
+
+                    }
+                    //the variable does not exist or is not a valid variable
+                    else
+                    {
+                        inValidVar = true;
+                        return 0;
+                    }
+                }
+
+                //the displayed value needs to be a string
+                if (count == 1)
+                {
+                    inValidVar = true;
+                    return 876697;
+                }
+                //trying to add a string and integers
+                else if (count > 1)
+                {
+                    inValidVar = true;
+                    return 0;
+                }
+                //
+                inValidVar = false;
+                return (double)new Formula(equation).Evaluate(findValue);
+            }
+        }
+
+        /// <summary>
+        /// Populating the spreadsheet. 
+        /// </summary>
+        /// <param name="col"></param>
+        /// <param name="row"></param>
+        /// <returns></returns>
+        private ISet<String> addToSpreadsheet(int col, int row)
+        {
+            lock (modelLock)
+            {
+                //adding to spreadsheet and checking if any exceptions are thrown. 
+                HashSet<String> temp;
+                try
+                {
+                    temp = (HashSet<String>)spreadsheetModel.SetContentsOfCell(getCellName(col, row), cContent.Text);
+                    clientSocketModel.Cell(getCellName(col, row), cContent.Text);
+                    return temp;
+                }
+                catch (CircularException c)
+                {
+                    //reverts the cell to its previous state before the exception was thrown. 
+                    String name = getCellName(col, row);
+                    clientSocketModel.Cell(getCellName(col, row), cContent.Text);
+                    MessageBox.Show(name + " is dependent on itself\n" + cContent.Text);
+
+                    /*                 updateView(name);
+                                   if (spreadsheetModel.GetNamesOfAllNonemptyCells().Count() == 0)
+                                    {
+                                        updateDisplays(name, "", "");
+                                    }
+                                    else
+                                    {
+                                        if (spreadsheetModel.GetCellContents(name) is String)
+                                        {
+                                            updateDisplays(name, "", "");
+                                        }
+                                        else
+                                        {
+                                            Formula f = (Formula)spreadsheetModel.GetCellContents(name);
+                                            updateDisplays(name, "=" + f.ToString(), "" + spreadsheetModel.GetCellValue(name));
+                                        }
+
+                                    }
+                                    */
+                }
+                catch (FormulaFormatException f)
+                {
+                    //reverts the cell to its previous state before the exception was thrown. 
+                    int x = col;
+                    int y = row;
+                    MessageBox.Show("The following formula is invalid: " + cContent.Text);
+                    updateDisplays(getCellName(x, y), "", "");
+                    sPanel.SetValue(x, y, "");
+
+                }
+                //      clientSocketModel.Cell(getCellName(col, row), cContent.Text);
+
+                return new HashSet<String>();
+            }
+        }
+
+        /// <summary>
+        /// Make sure all the cell show their value except the one that is clicked on. 
+        /// Need to work on what to do when the value is a formulaError
+        /// </summary>
+        /// <param name="update"></param>
+        private void updateView(IEnumerable<String> update)
+        {
+            //Loops through and updates all the cells
+            HashSet<String> cells = (HashSet<String>)update;
+            int row, col;
+            sPanel.GetSelection(out col, out row);
+            String temp = getCellName(col, row);
+
+            foreach (String name in cells)
+            {
+                if (!temp.Equals(name))
+                {
+                    setValue(name);
+                }
+            }
+        }
+
+        /// <summary>
+        /// Make sure all the cell show their value except the one that is clicked on. 
+        /// Need to work on what to do when the value is a formulaError
+        /// </summary>
+        /// <param name="update"></param>
+        private void updateView(String name)
+        {
+            setValue(name);
+        }
+
+
+        /// <summary>
+        /// Get the name of the cell depending on the row and col 
+        /// </summary>
+        /// <param name="col"></param> the column
+        /// <param name="row"></param> the row 
+        /// <returns></returns>
+        private string getCellName(int col, int row)
+        {
+            String name = "";
+            Char temp = (Char)(col +
+                65);
+            return name = temp.ToString() + (row + 1);
+        }
+
+        /// <summary>
+        /// Find the Col and Row of a Cell
+        /// </summary>
+        /// <param name="name"></param> The name of the Cell
+        /// <param name="col"></param> 
+        /// <param name="row"></param>
+        private void findCellLocation(string name, out int col, out int row)
+        {
+            name = name.ToUpper();
+            int temp = (int)name.ElementAt(0);
+            col = temp - 65;
+            int.TryParse(name.Substring(1), out row);
+            row--;
+        }
+
+        /// <summary>
+        /// Needed for Look up for getValue Method 
+        /// </summary>
+        /// <param name="s"></param>
+        /// <returns></returns>
+        private double findValue(String s)
+        {
+            return (Double)spreadsheetModel.GetCellValue(s);
+        }
+
+        /// <summary>
+        /// Checking to see if a variable is valid or not
+        /// </summary>
+        /// <param name="s"></param>
+        /// <returns></returns>
+        private Boolean isValid(String s)
+        {
+            return Regex.IsMatch(s, @"^[A-Z][0-9]{1,2}$");
+        }
+
+        /// <summary>
+        /// Updates all my textboxes
+        /// </summary>
+        /// <param name="name"></param>
+        /// <param name="content"></param>
+        /// <param name="value"></param>
+        private void updateDisplays(String name, String content, String value)
+        {
+            cName.Text = name;
+            cellName.Text = name;
+            cContent.Text = content;
+            cellContent.Text = content;
+            cValue.Text = value;
+            cellValue.Text = value;
+        }
+
+
+
+
+
+    }
+}

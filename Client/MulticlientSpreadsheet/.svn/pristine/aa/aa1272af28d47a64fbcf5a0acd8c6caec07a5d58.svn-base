@@ -1,0 +1,99 @@
+﻿using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
+using CustomNetworking;
+using System.Net.Sockets;
+
+namespace SS
+{
+    public class SSClientModel
+    {
+        private StringSocket socket;
+        public event Action<String> IncomingErrorEvent;
+        public event Action<String> CellChangeEvent;
+        public event Action<String> Connection;
+        public String filename;
+
+
+        public SSClientModel()
+        {
+            socket = null;
+        }
+
+        public void reset()
+        {
+            socket = null;
+        }
+        private void LineRecieved(string s, Exception e, object payload)
+        {
+            //TODO: Need to check for null string
+            if (!ReferenceEquals(s, null))
+            {
+                if (s.StartsWith("connected") && Connection != null)
+                {
+                    Connection(s);
+                }
+                else if (s.StartsWith("cell") && CellChangeEvent != null)
+                {
+                    CellChangeEvent(s);
+                }
+                else if (s.StartsWith("error") && IncomingErrorEvent != null)
+                {
+                    IncomingErrorEvent(s);
+                }
+
+                socket.BeginReceive(LineRecieved, null);
+            }
+
+        }
+
+        public void Connect(string host, int port, String name, String spreadName)
+        {
+            if (socket == null)
+            {
+                try
+                {
+                    // host.Trim();
+                    TcpClient client = new TcpClient(host.Trim(), port);
+                    socket = new StringSocket(client.Client, Encoding.ASCII);
+                    filename = spreadName;
+                    String message = "connect " + name + " " + spreadName + "\n";
+                    Console.WriteLine(message);
+                    socket.BeginSend(message, (e, p) => { }, null);
+                    socket.BeginReceive(LineRecieved, null);
+                }
+                catch (SocketException s)
+                {
+
+                    throw new SocketException();
+                }
+            }
+        }
+
+        public void Register(String name)
+        {
+            String message = "register " + name + "\n";
+            Console.WriteLine(message);
+            socket.BeginSend(message, (e, p) => { }, null);
+            socket.BeginReceive(LineRecieved, null);
+        }
+
+        public void Cell(string cellName, string cellContent)
+        {
+            String message = "cell " + cellName + " " + cellContent + "\n";
+            Console.WriteLine(message);
+            socket.BeginSend(message, (e, p) => { }, null);
+            socket.BeginReceive(LineRecieved, null);
+        }
+
+        public void Undo()
+        {
+            Console.WriteLine("UNDO");
+            socket.BeginSend("undo\n", (e, p) => { }, null);
+            socket.BeginReceive(LineRecieved, null);
+        }
+
+    }
+}

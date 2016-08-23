@@ -1,0 +1,37 @@
+﻿using System;
+using System.Collections.Generic;
+using System.ComponentModel;
+using System.Drawing;
+using System.Data;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
+using System.Windows.Forms;
+
+namespace SS
+{
+    public partial class RegisterScreen : UserControl
+    {
+        SSClientModel model;
+        Form1 form;
+        public RegisterScreen()
+        {
+            InitializeComponent();
+        }
+        public void setModel(SSClientModel m)
+        {
+            model = m;
+        }
+
+        public void setForm(Form1 f)
+        {
+            form = f;
+        }
+        private void RegButton_Click(object sender, EventArgs e)
+        {
+            String name = ReguName.Text;
+            model.Register(name);
+
+        }
+    }
+}
